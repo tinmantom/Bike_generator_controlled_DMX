@@ -9,6 +9,8 @@ The user can switch between putting power into a (relatively easy) dump load - a
 
 The current is recorded using a 50A allegro current sensor and used to control the brightness of the first 4 channels of a DMX512 universe. 
 
+The DMX is done using a MAX485 "TTL to RS485" module with the output enable pin held low.  
+
 It also outputs a pattern over a string of neopixels to represent the "state of charge" of a fictional battery that has been charged up and then is discharged by running the DMX lights (at full brightness)
 
 
