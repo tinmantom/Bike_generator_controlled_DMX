@@ -1,0 +1,163 @@
+#include <DmxSimple.h>
+#include <Adafruit_NeoPixel.h>
+#ifdef __AVR__
+  #include <avr/power.h>
+#endif
+
+#define PIN 1
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(56, PIN, NEO_GRB + NEO_KHZ800);
+
+
+// the setup routine runs once when you press reset:
+  int sensorValue;
+  float pedalCurrent;
+  float pedalCurrentMultiplier=1; //fudge factor to change the rate things change!
+  int pedalCurrentInt;
+ 
+  int batteryEnergyCounter;
+  int batteryEnergyCounterOld;
+  int decayRate=10; //fudge factor to change how quickly it discharges battery
+  int bigLoadDimness=50;  //fudge factor to make lights dim during big load situation - bigger number=dimmer
+void setup() {
+   strip.begin();
+  strip.show(); // Initialize all pixels to 'off'
+
+  pinMode(2, INPUT_PULLUP); //light on/off
+  pinMode(3, INPUT_PULLUP); //battery on/off
+
+
+    DmxSimple.usePin(10);
+    DmxSimple.maxChannel(4);
+     digitalWrite(12, LOW); //enable DMX
+    
+   
+}
+
+// the loop routine runs over and over again forever:
+void loop() {
+ 
+  if(digitalRead(3)==HIGH)
+  {
+    if(digitalRead(2)==HIGH)
+    {
+    //No Battery,  light off, nothing happens! But lets make sure it's easy to pedal and the light is off
+    digitalWrite(13, LOW);
+        DmxSimple.write(1, 0);
+        DmxSimple.write(2, 0);
+        DmxSimple.write(3, 0);
+    }
+   
+    if(digitalRead(2)==LOW) //no battery, light on, lets make it hard to crank and make the DMX lights dim
+    {
+      digitalWrite(13, HIGH); //use the relay to short out the bike generator
+        sensorValue = analogRead(A1);
+        pedalCurrent=sensorValue-125;
+       
+        if (pedalCurrent<=0)
+        {
+          pedalCurrent=0;
+         
+        }
+//Serial.print(pedalCurrent);
+        DmxSimple.write(1, (pedalCurrent/bigLoadDimness));
+        DmxSimple.write(2, (pedalCurrent/bigLoadDimness));
+        DmxSimple.write(3, (pedalCurrent/bigLoadDimness));
+        delay(1);
+    }
+  }
+  if(digitalRead(3)==LOW) //battery present
+  {
+    if(digitalRead(2)==HIGH)
+    {
+      //Battery present, no light on. So lets make sure the light is off then add some energy to the battery counter then update the battery level display lets make it easy to pedal
+        digitalWrite(13, LOW);
+        DmxSimple.write(1, 0);
+        DmxSimple.write(2, 0);
+        DmxSimple.write(3, 0);
+       
+        sensorValue = analogRead(A1);
+        pedalCurrent=(sensorValue-120)*pedalCurrentMultiplier;
+        pedalCurrentInt=pedalCurrent;
+        if (pedalCurrentInt<=0)
+        {
+          pedalCurrentInt=0;
+        }
+        batteryEnergyCounter=batteryEnergyCounter+(pedalCurrentInt);
+        if((batteryEnergyCounter/100)>=56)
+        {batteryEnergyCounter=5600;}
+       
+          for(int i=0; i<=(batteryEnergyCounter/100); i++)
+          {
+           strip.setPixelColor(i+6, (112-(2*(batteryEnergyCounter/100))),(2*(batteryEnergyCounter/100)),0);
+          }
+       
+           strip.show();
+        batteryEnergyCounterOld=batteryEnergyCounter;
+       
+
+      
+        //Serial.print(" ");
+        delay(50);
+    }
+    if(digitalRead(2)==LOW)
+    {
+    //Battery present, light is on. Lets make the light full brightness, diminish the batterycounter and update the battery counter display. If the battery counter is empty lets turn the light off
+    digitalWrite(13, HIGH); //make it hard to pedal!
+    if(batteryEnergyCounter>0)
+    {
+        DmxSimple.write(1, 255);
+        DmxSimple.write(2, 255);
+        DmxSimple.write(3, 255);
+       
+        sensorValue = analogRead(A1);
+        pedalCurrent=(sensorValue-120)*pedalCurrentMultiplier;
+        pedalCurrentInt=pedalCurrent;
+        if (pedalCurrentInt<=0)
+        {
+          pedalCurrentInt=0;
+        }
+  
+        batteryEnergyCounter=batteryEnergyCounter-decayRate;
+        
+        {
+           for(int i=(batteryEnergyCounter/100); i>0; i--)
+           {
+             strip.setPixelColor(i+6, (100-((2*batteryEnergyCounter/100))),(2*(batteryEnergyCounter/100)),0);
+           }
+
+            for(int i=(batteryEnergyCounter/100); i<60; i++)
+           {
+             strip.setPixelColor(i+6, 0,0,0);
+           }
+          
+        }
+           strip.show();
+        batteryEnergyCounterOld=batteryEnergyCounter;
+
+        delay(5);
+      
+     }
+     if(batteryEnergyCounter<=0)
+     {
+        sensorValue = analogRead(A1);
+        pedalCurrent=sensorValue-125;
+       
+        if (pedalCurrent<=0)
+        {
+          pedalCurrent=0;
+         
+        }
+        DmxSimple.write(1, pedalCurrent/bigLoadDimness);
+        DmxSimple.write(2, pedalCurrent/bigLoadDimness);
+        DmxSimple.write(3, pedalCurrent/bigLoadDimness);
+ 
+        delay(5);
+     }
+     delay(1);
+    }
+   
+   
+  }
+  delay(1);
+}
+
